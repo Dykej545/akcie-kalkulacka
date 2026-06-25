@@ -1,40 +1,47 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(layout="wide")
-st.title("📊 Investiční Dashboard: Profesionální Tracker")
+st.set_page_config(layout="wide", page_title="Investiční Dashboard")
 
-# 1. Nahrání portfolia z CSV
-st.subheader("📁 Nahrát portfolio z Google Sheets (CSV)")
-uploaded_file = st.file_uploader("Vyber svůj CSV soubor exportovaný z Google Sheets", type="csv")
+# --- CSS PRO DESIGN ---
+st.markdown("""
+    <style>
+    .metric-card { background-color: #f0f2f6; padding: 20px; border-radius: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-if uploaded_file is not None:
-    # Načtení dat
+st.title("📈 Investiční Dashboard")
+
+# Nahrání dat
+uploaded_file = st.file_uploader("Nahraj svůj export z Google Sheets (CSV)", type="csv")
+
+if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    st.session_state.portfolio = df
-    st.success("Portfolio úspěšně načteno!")
-
-# Zobrazení dat, pokud existují
-if 'portfolio' in st.session_state:
-    st.subheader("Aktuální stav portfolia")
-    st.dataframe(st.session_state.portfolio, use_container_width=True)
-
-    # 2. Fundamentální analýza (pro vybranou akcii z nahraného CSV)
-    st.subheader("🔍 Fundamentální analýza")
-    tickers = st.session_state.portfolio["Ticker"].unique()
-    selected_ticker = st.selectbox("Vyber akcii k analýze", tickers)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        pe = st.number_input("Cílový P/E poměr", value=25.0)
-        growth = st.slider("Roční růst EPS (%)", 0, 50, 15) / 100
-    with col2:
-        base_eps = st.number_input("Výchozí EPS (TTM)", value=3.0)
-        years = st.slider("Horizont (roky)", 1, 10, 5)
+    # 1. HLAVNÍ METRIKY (KPIs)
+    st.subheader("Přehled portfolia")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Celková investice (CZK)", f"{df['investovaná suma v CZK'].sum():,.0f} Kč")
+    c2.metric("Aktuální hodnota (USD)", f"{df['aktuální hodnota v USD'].sum():,.2f} $")
+    c3.metric("Celkový profit", f"{df['profit'].sum():,.2f} $")
 
-    # Výpočet projekce
-    budouci_cena = (base_eps * (1 + growth)**years) * pe
-    st.metric(label=f"Odhadovaná cena {selected_ticker} za {years} let", value=f"{round(budouci_cena, 2)} USD")
+    # 2. VIZUALIZACE
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.subheader("Diverzifikace podle sektorů")
+        fig_pie = px.pie(df, values='aktuální hodnota v USD', names='sektor', hole=0.4)
+        st.plotly_chart(fig_pie, use_container_width=True)
+        
+    with col_b:
+        st.subheader("Výkonnost podle akcií")
+        fig_bar = px.bar(df, x='Ticker', y='profit', color='profit', color_continuous_scale='RdYlGn')
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    # 3. TABULKA S DETAILY
+    st.subheader("Detailní tabulka")
+    st.dataframe(df, use_container_width=True)
 
 else:
-    st.info("Nahraj prosím svůj CSV soubor z Google Sheets pro zobrazení portfolia.")
+    st.info("Nahraj CSV soubor ze svého Google Sheetu pro zobrazení vizualizací.")
