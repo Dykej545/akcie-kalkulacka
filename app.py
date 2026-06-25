@@ -6,44 +6,53 @@ import plotly.express as px
 st.set_page_config(layout="wide")
 st.title("💰 Portfolio v CZK & Srovnání se S&P 500")
 
-# 1. Stažení aktuálních kurzů
-@st.cache_data(ttl=3600) # Kurz se aktualizuje jednou za hodinu
+# --- Funkce pro kurzy ---
+@st.cache_data(ttl=3600)
 def get_exchange_rates():
-    data = yf.download(["USDCZK=X", "EURCZK=X"], period="1d")
-    rates = data['Close'].iloc[-1]
-    return rates['USDCZK=X'], rates['EURCZK=X']
+    # Stáhneme oba kurzy najednou
+    data = yf.download(["USDCZK=X", "EURCZK=X"], period="1d", progress=False)
+    # Zajištění, že máme data
+    if not data.empty:
+        rates = data['Close'].iloc[-1]
+        return rates['USDCZK=X'], rates['EURCZK=X']
+    return 23.5, 25.0 # Záložní kurzy pokud yfinance selže
 
-usd_czk, eur_czk = get_exchange_rates()
-st.sidebar.write(f"Aktuální kurz: 1 USD = {usd_czk:.2f} CZK")
-
-# 2. Nahrání portfolia
-uploaded_file = st.file_uploader("Nahraj CSV", type="csv")
+# --- Nahrání souboru ---
+uploaded_file = st.file_uploader("Nahraj svůj CSV soubor", type="csv")
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    # Čištění (jen akcie)
-    df = df[df['Sektor'] == 'Akcie'] 
     
-    # Převod na CZK
-    def to_czk(row):
-        val = float(str(row['Aktuální hodnota (USD)']).replace('$','').replace(',',''))
-        return val * usd_czk
+    # Debug: Zobrazení, co jsme načetli
+    st.write(f"Načteno řádků: {len(df)}")
     
-    df['Hodnota v CZK'] = df.apply(to_czk, axis=1)
+    # 1. PŘEVOD NA CZK (podle toho, co v tabulce máš)
+    # Předpokládáme, že sloupce mají názvy 'Aktuální hodnota (USD)' a 'Aktuální hodnota (EUR)'
+    usd_rate, eur_rate = get_exchange_rates()
     
-    # Metriky
+    # Funkce pro vyčištění a převod
+    def clean_and_convert(val, rate):
+        if isinstance(val, str):
+            val = val.replace('$','').replace('€','').replace(',','').replace(' ','')
+        try:
+            return float(val) * rate
+        except:
+            return 0.0
+
+    # Přepočet na CZK
+    df['Hodnota v CZK'] = 0.0
+    if 'Aktuální hodnota (USD)' in df.columns:
+        df['Hodnota v CZK'] += df['Aktuální hodnota (USD)'].apply(lambda x: clean_and_convert(x, usd_rate))
+    if 'Aktuální hodnota (EUR)' in df.columns:
+        df['Hodnota v CZK'] += df['Aktuální hodnota (EUR)'].apply(lambda x: clean_and_convert(x, eur_rate))
+
+    # 2. ZOBRAZENÍ DAT
+    st.subheader("Aktuální stav portfolia")
+    st.dataframe(df, use_container_width=True)
+
+    # 3. METRIKY (Součty)
     total_czk = df['Hodnota v CZK'].sum()
-    profit_czk = (df['Profit'].str.replace('$','').astype(float) * usd_czk).sum()
-    profit_pct = (profit_czk / (total_czk - profit_czk)) * 100
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Celková hodnota (CZK)", f"{total_czk:,.0f} Kč")
-    c2.metric("Celkový profit", f"{profit_czk:,.0f} Kč")
-    c3.metric("Profit v %", f"{profit_pct:.2f} %")
+    st.metric("Celková hodnota celého portfolia (CZK)", f"{total_czk:,.0f} Kč")
 
-    # 3. Srovnání se S&P 500
-    st.subheader("Srovnání s S&P 500 (Vývoj 1 rok)")
-    sp500 = yf.download("^GSPC", period="1y")['Close']
-    st.line_chart(sp500)
-
-    st.dataframe(df)
+else:
+    st.info("Nahraj prosím CSV soubor ze svého Google Sheetu.")
