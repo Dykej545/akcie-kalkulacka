@@ -43,3 +43,6 @@ st.subheader(f"Projekce pro {firma}")
 st.table(df)
 
 st.line_chart(df.set_index("Rok")["Odhadovaná cena"])
+Plaintext
+streamlit
+pandas
