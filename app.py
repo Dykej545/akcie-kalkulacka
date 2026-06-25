@@ -22,7 +22,7 @@ if uploaded_file:
     # 1. HLAVNÍ METRIKY (KPIs)
     st.subheader("Přehled portfolia")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Celková investice (CZK)", f"{df['investovaná suma v CZK'].sum():,.0f} Kč")
+    c1.metric("Celková investice (CZK)", f"{df['Investovaná suma'].sum():,.0f} Kč")
     c2.metric("Aktuální hodnota (USD)", f"{df['aktuální hodnota v USD'].sum():,.2f} $")
     c3.metric("Celkový profit", f"{df['profit'].sum():,.2f} $")
 
